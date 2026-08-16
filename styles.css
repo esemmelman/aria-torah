@@ -176,7 +176,7 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .word-space.audio-active { font-weight: 700; }
 
 .group-audio-controls {
-  display: none;
+  display: inline-flex;
   direction: ltr;
   gap: 3px;
   margin: 0 .2em;
