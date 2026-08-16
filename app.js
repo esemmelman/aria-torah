@@ -4,7 +4,10 @@ const tropeToggle = document.querySelector('#trope-toggle');
 const scriptToggle = document.querySelector('#script-toggle');
 const SUPABASE_URL = 'https://fgomaujsdblpzxhnnqrg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_JOUqLZDnfGu_yCa6k6FVDQ_AYwpr72i';
+const SUPABASE_STORAGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnb21hdWpzZGJscHp4aG5ucXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNjM3MjYsImV4cCI6MjA5OTgzOTcyNn0.1iMPI_7F_8ioNVnuThxqAKfMfD7G4NbyXilXZEERScw';
 const HIGHLIGHT_TABLE = 'aria_torah_highlight_groups_v1';
+const RECORDING_TABLE = 'aria_torah_group_recordings_v1';
+const RECORDING_BUCKET = 'aria-torah-group-recordings-v1';
 const PASSAGE_KEY = 'exodus-14-15-30';
 
 const FALLBACK_VERSES = [
@@ -34,6 +37,8 @@ let scriptMode = false;
 const HIGHLIGHT_STORAGE_KEY = 'aria-torah-highlights-v1';
 let highlights = loadHighlights();
 let highlightsReady = false;
+const recordings = new Map();
+let activeRecorder = null;
 const ALIYAH_HEADINGS = new Map([
   [15, 'Aliya 1'],
   [19, 'Aliyah 2'],
@@ -125,10 +130,157 @@ async function loadRemoteHighlights() {
       color: item.color
     }));
     highlightsReady = true;
+    await loadRecordings();
     updateDisplay();
   } catch (error) {
     status.textContent = 'Saved highlights could not be loaded. You can still read the passage.';
   }
+}
+
+async function loadRecordings() {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?select=highlight_group_id,object_path,mime_type,byte_size`, {
+    headers: supabaseHeaders()
+  });
+  if (!response.ok) throw new Error('Recording request failed');
+  recordings.clear();
+  (await response.json()).forEach(item => recordings.set(item.highlight_group_id, item));
+}
+
+function recordingUrl(objectPath) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${RECORDING_BUCKET}/${objectPath}`;
+}
+
+function preferredRecordingType() {
+  const types = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
+  return types.find(type => MediaRecorder.isTypeSupported(type)) || '';
+}
+
+function recordingExtension(mimeType) {
+  if (mimeType.includes('ogg')) return 'ogg';
+  if (mimeType.includes('mp4')) return 'mp4';
+  return 'webm';
+}
+
+async function uploadRecording(groupId, blob) {
+  const mimeType = blob.type.split(';')[0] || 'audio/webm';
+  const objectPath = `groups/${groupId}.${recordingExtension(mimeType)}`;
+  const uploadResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/${RECORDING_BUCKET}/${objectPath}`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_STORAGE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_STORAGE_ANON_KEY}`,
+      'Content-Type': mimeType,
+      'x-upsert': 'true'
+    },
+    body: blob
+  });
+  if (!uploadResponse.ok) throw new Error('Audio upload failed');
+
+  const metadataResponse = await fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?on_conflict=highlight_group_id`, {
+    method: 'POST',
+    headers: supabaseHeaders({ Prefer: 'resolution=merge-duplicates,return=representation' }),
+    body: JSON.stringify({
+      highlight_group_id: groupId,
+      object_path: objectPath,
+      mime_type: mimeType,
+      byte_size: blob.size,
+      updated_at: new Date().toISOString()
+    })
+  });
+  if (!metadataResponse.ok) throw new Error('Recording metadata save failed');
+  const [saved] = await metadataResponse.json();
+  recordings.set(groupId, saved);
+}
+
+async function toggleGroupRecording(button) {
+  if (!highlightsReady) {
+    status.textContent = 'Please wait for saved groups to finish loading.';
+    return;
+  }
+  const groupId = Number(button.dataset.groupId);
+  if (activeRecorder) {
+    if (activeRecorder.groupId !== groupId) {
+      status.textContent = 'Stop the current recording before starting another group.';
+      return;
+    }
+    activeRecorder.recorder.stop();
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    status.textContent = 'Audio recording is not supported in this browser.';
+    return;
+  }
+
+  try {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: { ideal: 48000 },
+          channelCount: { ideal: 1 },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+    } catch (error) {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    const mimeType = preferredRecordingType();
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 256000
+      });
+    } catch (error) {
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    }
+    const chunks = [];
+    recorder.ondataavailable = event => {
+      if (event.data.size) chunks.push(event.data);
+    };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop());
+      button.disabled = true;
+      button.textContent = '↑';
+      status.textContent = `Saving recording for group ${groupId}…`;
+      try {
+        const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' });
+        await uploadRecording(groupId, blob);
+        status.textContent = `Recording saved for group ${groupId}.`;
+      } catch (error) {
+        status.textContent = 'The recording could not be saved. Please record this group again.';
+      } finally {
+        activeRecorder = null;
+        updateDisplay();
+      }
+    };
+    activeRecorder = { groupId, recorder };
+    recorder.start(1000);
+    button.classList.add('recording');
+    button.textContent = '■';
+    button.setAttribute('aria-label', `Stop recording group ${groupId}`);
+    status.textContent = `Recording group ${groupId} in high quality. Select stop when finished.`;
+  } catch (error) {
+    status.textContent = 'Microphone access is required to record this group.';
+  }
+}
+
+function playGroupRecording(button) {
+  const groupId = Number(button.dataset.groupId);
+  const recording = recordings.get(groupId);
+  if (!recording) return;
+  const audio = new Audio(`${recordingUrl(recording.object_path)}?v=${Date.now()}`);
+  button.disabled = true;
+  audio.onended = () => { button.disabled = false; };
+  audio.onerror = () => {
+    button.disabled = false;
+    status.textContent = 'The saved group recording could not be played.';
+  };
+  audio.play();
+  status.textContent = `Playing recording for group ${groupId}.`;
 }
 
 function displayText(text) {
@@ -190,6 +342,32 @@ function renderVerses(texts) {
         const nextHighlight = highlightForWord(number, wordIndex + 1);
         if (highlight && nextHighlight === highlight) space.classList.add(`highlight-${highlight.color}`);
         words.append(space);
+      }
+
+      if (!scriptMode && highlight && wordIndex === highlight.end) {
+        const controls = document.createElement('span');
+        controls.className = 'group-audio-controls';
+
+        const recordButton = document.createElement('button');
+        recordButton.type = 'button';
+        recordButton.className = 'group-audio-button record-group';
+        recordButton.dataset.groupId = highlight.id;
+        recordButton.textContent = '●';
+        recordButton.setAttribute('aria-label', `${recordings.has(highlight.id) ? 'Re-record' : 'Record'} highlighted group ${highlight.id}`);
+        recordButton.title = recordings.has(highlight.id) ? 'Re-record this group' : 'Record this group';
+        controls.append(recordButton);
+
+        if (recordings.has(highlight.id)) {
+          const playButton = document.createElement('button');
+          playButton.type = 'button';
+          playButton.className = 'group-audio-button play-group';
+          playButton.dataset.groupId = highlight.id;
+          playButton.textContent = '▶';
+          playButton.setAttribute('aria-label', `Play recording for highlighted group ${highlight.id}`);
+          playButton.title = 'Play saved recording';
+          controls.append(playButton);
+        }
+        words.append(controls);
       }
     });
 
@@ -272,6 +450,16 @@ async function playVerse(button) {
 }
 
 passage.addEventListener('click', event => {
+  const recordButton = event.target.closest('.record-group');
+  if (recordButton) {
+    toggleGroupRecording(recordButton);
+    return;
+  }
+  const playButton = event.target.closest('.play-group');
+  if (playButton) {
+    playGroupRecording(playButton);
+    return;
+  }
   const button = event.target.closest('.verse-number');
   if (button) playVerse(button);
 });

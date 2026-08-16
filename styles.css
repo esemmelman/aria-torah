@@ -157,6 +157,35 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .word-space.highlight-1 { background: #f3d88e; }
 .word-space.highlight-2 { background: #bcdac8; }
 
+.group-audio-controls {
+  display: inline-flex;
+  direction: ltr;
+  gap: 3px;
+  margin: 0 .2em;
+  vertical-align: middle;
+}
+
+.group-audio-button {
+  display: inline-grid;
+  width: 2em;
+  height: 2em;
+  place-items: center;
+  border: 1px solid #cab98f;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--green);
+  background: #fffaf0;
+  cursor: pointer;
+  font: 600 .34em/1 Arial, sans-serif;
+}
+
+.group-audio-button:hover { color: white; background: var(--green); border-color: var(--green); }
+.group-audio-button.record-group { color: #a43f32; }
+.group-audio-button.recording { color: white; background: #a43f32; border-color: #a43f32; animation: recording-pulse 1.2s infinite; }
+.group-audio-button:disabled { opacity: .55; cursor: wait; }
+
+@keyframes recording-pulse { 50% { transform: scale(.88); opacity: .75; } }
+
 .script-mode .verse-row {
   font-family: "Stam Ashkenaz CLM", "Taamey Frank CLM", "Frank Ruhl Libre", serif;
   line-height: 1.65;
@@ -216,4 +245,4 @@ select { margin-left: 6px; padding: 8px 12px; }
   .controls { flex-direction: column; gap: 10px; }
 }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
