@@ -154,13 +154,15 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 }
 .word.highlight-1 { color: #76500f; background: #f3d88e; }
 .word.highlight-2 { color: #244b3a; background: #bcdac8; }
+.word-space.highlight-1 { background: #f3d88e; }
+.word-space.highlight-2 { background: #bcdac8; }
 
 .script-mode .verse-row {
   font-family: "Stam Ashkenaz CLM", "Taamey Frank CLM", "Frank Ruhl Libre", serif;
   line-height: 1.65;
 }
 
-.script-mode .word[class*="highlight-"] { color: inherit; background: transparent; }
+.script-mode .word[class*="highlight-"], .script-mode .word-space[class*="highlight-"] { color: inherit; background: transparent; }
 
 .corner { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: var(--gold); font-family: "FrankRuehl", "Frank Ruhl Libre", serif; }
 
@@ -192,7 +194,17 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .controls label { color: var(--muted); font: .78rem Arial, sans-serif; }
 select { margin-left: 6px; padding: 8px 12px; }
 .status { min-height: 1.3em; color: var(--muted); font-style: italic; }
-.version { margin: 18px 0 0; color: var(--muted); font: .7rem/1 Arial, sans-serif; letter-spacing: .08em; }
+.version {
+  display: inline-block;
+  margin: 18px 0 0;
+  border: 1px solid rgba(82,70,45,.2);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--muted);
+  background: rgba(255,253,247,.65);
+  font: .72rem/1 Arial, sans-serif;
+  letter-spacing: .08em;
+}
 
 .translation { max-width: 650px; margin: 38px auto 0; padding-top: 25px; border-top: 1px solid rgba(82,70,45,.2); }
 .translation h2 { margin: 0 0 8px; color: var(--gold); font: 700 .72rem Arial, sans-serif; letter-spacing: .18em; text-transform: uppercase; }

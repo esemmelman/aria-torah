@@ -2,6 +2,10 @@ const passage = document.querySelector('#passage');
 const status = document.querySelector('#status');
 const tropeToggle = document.querySelector('#trope-toggle');
 const scriptToggle = document.querySelector('#script-toggle');
+const SUPABASE_URL = 'https://fgomaujsdblpzxhnnqrg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_JOUqLZDnfGu_yCa6k6FVDQ_AYwpr72i';
+const HIGHLIGHT_TABLE = 'aria_torah_highlight_groups_v1';
+const PASSAGE_KEY = 'exodus-14-15-30';
 
 const FALLBACK_VERSES = [
   'ויאמר יהוה אל משה מה תצעק אלי דבר אל בני ישראל ויסעו׃',
@@ -29,6 +33,7 @@ let showTrope = false;
 let scriptMode = false;
 const HIGHLIGHT_STORAGE_KEY = 'aria-torah-highlights-v1';
 let highlights = loadHighlights();
+let highlightsReady = false;
 const ALIYAH_HEADINGS = new Map([
   [15, 'Aliya 1'],
   [19, 'Aliyah 2'],
@@ -76,8 +81,54 @@ function loadHighlights() {
   }
 }
 
-function saveHighlights() {
-  localStorage.setItem(HIGHLIGHT_STORAGE_KEY, JSON.stringify(highlights));
+function supabaseHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    ...extra
+  };
+}
+
+function highlightForWord(verse, wordIndex) {
+  return highlights.find(item => item.verse === verse && wordIndex >= item.start && wordIndex <= item.end);
+}
+
+async function loadRemoteHighlights() {
+  const locallySaved = loadHighlights();
+  try {
+    if (locallySaved.length) {
+      const migrationRows = locallySaved.map(item => ({
+        passage_key: PASSAGE_KEY,
+        verse: item.verse,
+        start_word: item.start,
+        end_word: item.end,
+        color: item.color
+      }));
+      const migrationResponse = await fetch(`${SUPABASE_URL}/rest/v1/${HIGHLIGHT_TABLE}?on_conflict=passage_key,verse,start_word,end_word`, {
+        method: 'POST',
+        headers: supabaseHeaders({ Prefer: 'resolution=ignore-duplicates' }),
+        body: JSON.stringify(migrationRows)
+      });
+      if (!migrationResponse.ok) throw new Error('Local highlight migration failed');
+      localStorage.removeItem(HIGHLIGHT_STORAGE_KEY);
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${HIGHLIGHT_TABLE}?passage_key=eq.${PASSAGE_KEY}&select=id,verse,start_word,end_word,color&order=id.asc`, {
+      headers: supabaseHeaders()
+    });
+    if (!response.ok) throw new Error('Highlight request failed');
+    highlights = (await response.json()).map(item => ({
+      id: item.id,
+      verse: item.verse,
+      start: item.start_word,
+      end: item.end_word,
+      color: item.color
+    }));
+    highlightsReady = true;
+    updateDisplay();
+  } catch (error) {
+    status.textContent = 'Saved highlights could not be loaded. You can still read the passage.';
+  }
 }
 
 function displayText(text) {
@@ -122,15 +173,24 @@ function renderVerses(texts) {
     words.dataset.verse = number;
 
     const displayedText = displayText(text);
-    const tokens = displayedText.match(/\S+\s*/g) || [];
-    tokens.forEach(token => {
+    const tokens = displayedText.trim().split(/\s+/);
+    tokens.forEach((token, wordIndex) => {
       const word = document.createElement('span');
       word.className = 'word';
-      word.dataset.word = words.childElementCount;
+      word.dataset.word = wordIndex;
       word.textContent = token;
-      const highlight = highlights.find(item => item.verse === number && Number(word.dataset.word) >= item.start && Number(word.dataset.word) <= item.end);
+      const highlight = highlightForWord(number, wordIndex);
       if (highlight) word.classList.add(`highlight-${highlight.color}`);
       words.append(word);
+
+      if (wordIndex < tokens.length - 1) {
+        const space = document.createElement('span');
+        space.className = 'word-space';
+        space.textContent = ' ';
+        const nextHighlight = highlightForWord(number, wordIndex + 1);
+        if (highlight && nextHighlight === highlight) space.classList.add(`highlight-${highlight.color}`);
+        words.append(space);
+      }
     });
 
     row.append(button, words);
@@ -216,8 +276,12 @@ passage.addEventListener('click', event => {
   if (button) playVerse(button);
 });
 
-passage.addEventListener('mouseup', () => {
+passage.addEventListener('mouseup', async () => {
   if (scriptMode) return;
+  if (!highlightsReady) {
+    status.textContent = 'Please wait for saved highlights to finish loading.';
+    return;
+  }
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || !selection.rangeCount) return;
 
@@ -245,20 +309,39 @@ passage.addEventListener('mouseup', () => {
   const overlapping = highlights.filter(item => item.verse === verse && item.start <= end && item.end >= start);
 
   if (overlapping.length) {
-    highlights = highlights.filter(item => !overlapping.includes(item));
-    saveHighlights();
-    selection.removeAllRanges();
-    updateDisplay();
-    status.textContent = `Cleared highlighting in verse ${verse}.`;
+    try {
+      const ids = overlapping.map(item => item.id).filter(Boolean).join(',');
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${HIGHLIGHT_TABLE}?id=in.(${ids})`, {
+        method: 'DELETE',
+        headers: supabaseHeaders()
+      });
+      if (!response.ok) throw new Error('Delete failed');
+      highlights = highlights.filter(item => !overlapping.includes(item));
+      selection.removeAllRanges();
+      updateDisplay();
+      status.textContent = `Cleared highlighting in verse ${verse}.`;
+    } catch (error) {
+      status.textContent = 'The highlight could not be cleared. Please try again.';
+    }
     return;
   }
 
   const nextColor = highlights.length ? (highlights.at(-1).color % 2) + 1 : 1;
-  highlights.push({ verse, start, end, color: nextColor });
-  saveHighlights();
-  selection.removeAllRanges();
-  updateDisplay();
-  status.textContent = `Highlighted a word group in verse ${verse}.`;
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${HIGHLIGHT_TABLE}`, {
+      method: 'POST',
+      headers: supabaseHeaders({ Prefer: 'return=representation' }),
+      body: JSON.stringify({ passage_key: PASSAGE_KEY, verse, start_word: start, end_word: end, color: nextColor })
+    });
+    if (!response.ok) throw new Error('Save failed');
+    const [saved] = await response.json();
+    highlights.push({ id: saved.id, verse, start, end, color: nextColor });
+    selection.removeAllRanges();
+    updateDisplay();
+    status.textContent = `Highlighted and saved a word group in verse ${verse}.`;
+  } catch (error) {
+    status.textContent = 'The highlight could not be saved. Please try again.';
+  }
 });
 
 tropeToggle.addEventListener('click', () => {
@@ -273,3 +356,4 @@ scriptToggle.addEventListener('click', () => {
 
 updateDisplay();
 loadPointedText();
+loadRemoteHighlights();
