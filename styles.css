@@ -54,6 +54,17 @@ body::before {
   text-align: center;
 }
 
+.page-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  margin: -72px calc(50% - 50vw) 18px;
+  padding: 54px max(16px, calc((100vw - 980px) / 2)) 0;
+  background: rgba(247, 239, 221, .96);
+  box-shadow: 0 8px 20px rgba(72,57,31,.08);
+  backdrop-filter: blur(8px);
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--gold);
@@ -67,7 +78,8 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin: 0 0 18px;
+  margin: 0;
+  padding-bottom: 18px;
 }
 
 .display-toggle {
@@ -241,6 +253,7 @@ select { margin-left: 6px; padding: 8px 12px; }
 
 @media (max-width: 560px) {
   .page { padding-top: 38px; }
+  .page-header { margin-top: -38px; padding-top: 28px; }
   .verse-text { line-height: 1.8; }
   .controls { flex-direction: column; gap: 10px; }
 }
