@@ -142,7 +142,7 @@ async function loadRemoteHighlights() {
 }
 
 async function loadRecordings() {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?select=highlight_group_id,object_path,mime_type,byte_size`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${RECORDING_TABLE}?select=highlight_group_id,object_path,mime_type,byte_size,updated_at`, {
     headers: supabaseHeaders()
   });
   if (!response.ok) throw new Error('Recording request failed');
@@ -152,6 +152,10 @@ async function loadRecordings() {
 
 function recordingUrl(objectPath) {
   return `${SUPABASE_URL}/storage/v1/object/public/${RECORDING_BUCKET}/${objectPath}`;
+}
+
+function currentRecordingUrl(recording) {
+  return `${recordingUrl(recording.object_path)}?v=${encodeURIComponent(recording.updated_at || recording.byte_size)}`;
 }
 
 function preferredRecordingType() {
@@ -305,7 +309,7 @@ function playHoveredGroup(groupId) {
   const recording = recordings.get(groupId);
   if (!recording) return;
 
-  const audio = new Audio(recordingUrl(recording.object_path));
+  const audio = new Audio(currentRecordingUrl(recording));
   hoveredGroupId = groupId;
   hoveredGroupAudio = audio;
   setPlayingGroup(groupId);
@@ -498,7 +502,7 @@ function speechBounds(buffer) {
 
 async function prepareGroupAudio(group, audioContext) {
   const recording = recordings.get(group.id);
-  const response = await fetch(recordingUrl(recording.object_path));
+  const response = await fetch(currentRecordingUrl(recording));
   if (!response.ok) throw new Error('Recording download failed');
   const buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
   return { group, buffer, ...speechBounds(buffer) };
