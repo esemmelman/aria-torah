@@ -31,6 +31,7 @@ const FALLBACK_VERSES = [
 
 const audioByVerse = new Map();
 let activeVerse = null;
+let activePlaylist = null;
 let sourceVerses = FALLBACK_VERSES;
 let showTrope = false;
 let scriptMode = false;
@@ -269,6 +270,7 @@ async function toggleGroupRecording(button) {
 }
 
 function playGroupRecording(button) {
+  stopRecordedVerse();
   const groupId = Number(button.dataset.groupId);
   const recording = recordings.get(groupId);
   if (!recording) return;
@@ -317,7 +319,7 @@ function renderVerses(texts) {
     button.type = 'button';
     button.textContent = number;
     button.dataset.verse = number;
-    button.setAttribute('aria-label', `Play Exodus chapter 14, verse ${number}`);
+    button.setAttribute('aria-label', `Play all saved group recordings for verse ${number}`);
 
     const words = document.createElement('span');
     words.className = 'verse-line';
@@ -398,6 +400,64 @@ function resetActiveVerse() {
   activeVerse = null;
 }
 
+function stopRecordedVerse(message = '') {
+  if (!activePlaylist) return;
+  activePlaylist.audio?.pause();
+  activePlaylist.finishCurrent?.();
+  activePlaylist.button.classList.remove('playing');
+  activePlaylist.button.textContent = activePlaylist.number;
+  activePlaylist = null;
+  if (message) status.textContent = message;
+}
+
+async function playRecordedVerse(button) {
+  const number = Number(button.dataset.verse);
+  if (activePlaylist?.number === number) {
+    stopRecordedVerse(`Verse ${number} playback stopped.`);
+    return;
+  }
+
+  stopRecordedVerse();
+  resetActiveVerse();
+  const groups = highlights
+    .filter(group => group.verse === number && recordings.has(group.id))
+    .sort((a, b) => a.start - b.start);
+
+  if (!groups.length) {
+    status.textContent = `Verse ${number} has no saved group recordings.`;
+    return;
+  }
+
+  const token = Symbol('verse-playlist');
+  activePlaylist = { number, button, token, audio: null, finishCurrent: null };
+  button.classList.add('playing');
+  button.textContent = '■';
+
+  try {
+    for (let index = 0; index < groups.length; index += 1) {
+      if (activePlaylist?.token !== token) return;
+      const recording = recordings.get(groups[index].id);
+      const audio = new Audio(recordingUrl(recording.object_path));
+      activePlaylist.audio = audio;
+      status.textContent = `Playing verse ${number}: group ${index + 1} of ${groups.length}.`;
+      await new Promise((resolve, reject) => {
+        activePlaylist.finishCurrent = resolve;
+        audio.onended = resolve;
+        audio.onerror = reject;
+        audio.play().catch(reject);
+      });
+    }
+
+    if (activePlaylist?.token === token) {
+      stopRecordedVerse(`Verse ${number} complete.`);
+    }
+  } catch (error) {
+    if (activePlaylist?.token === token) {
+      stopRecordedVerse(`A saved recording in verse ${number} could not be played.`);
+    }
+  }
+}
+
 async function playVerse(button) {
   const number = Number(button.dataset.verse);
   if (activeVerse?.number === number && !activeVerse.audio.paused) {
@@ -461,7 +521,7 @@ passage.addEventListener('click', event => {
     return;
   }
   const button = event.target.closest('.verse-number');
-  if (button) playVerse(button);
+  if (button) playRecordedVerse(button);
 });
 
 passage.addEventListener('mouseup', async () => {
