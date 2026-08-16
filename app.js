@@ -642,15 +642,15 @@ passage.addEventListener('click', event => {
 });
 
 passage.addEventListener('mouseover', event => {
-  const target = event.target.closest('[data-group-id]');
+  const target = event.target.closest('.word[data-group-id], .word-space[data-group-id]');
   if (!target || !passage.contains(target)) return;
   playHoveredGroup(Number(target.dataset.groupId));
 });
 
 passage.addEventListener('mouseout', event => {
-  const target = event.target.closest('[data-group-id]');
+  const target = event.target.closest('.word[data-group-id], .word-space[data-group-id]');
   if (!target || Number(target.dataset.groupId) !== hoveredGroupId) return;
-  const nextTarget = event.relatedTarget?.closest?.('[data-group-id]');
+  const nextTarget = event.relatedTarget?.closest?.('.word[data-group-id], .word-space[data-group-id]');
   if (nextTarget && Number(nextTarget.dataset.groupId) === hoveredGroupId) return;
   stopHoveredGroup();
 });
