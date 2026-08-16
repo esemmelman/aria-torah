@@ -27,6 +27,8 @@ let activeVerse = null;
 let sourceVerses = FALLBACK_VERSES;
 let showTrope = false;
 let scriptMode = false;
+const HIGHLIGHT_STORAGE_KEY = 'aria-torah-highlights-v1';
+let highlights = loadHighlights();
 const ALIYAH_HEADINGS = new Map([
   [15, 'Aliya 1'],
   [19, 'Aliyah 2'],
@@ -63,6 +65,19 @@ function stripHtml(value) {
   const template = document.createElement('template');
   template.innerHTML = value;
   return template.content.textContent.trim();
+}
+
+function loadHighlights() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HIGHLIGHT_STORAGE_KEY));
+    return Array.isArray(saved) ? saved : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveHighlights() {
+  localStorage.setItem(HIGHLIGHT_STORAGE_KEY, JSON.stringify(highlights));
 }
 
 function displayText(text) {
@@ -104,7 +119,21 @@ function renderVerses(texts) {
     const words = document.createElement('span');
     words.className = 'verse-line';
     words.lang = 'he';
-    words.textContent = displayText(text);
+    words.dataset.verse = number;
+
+    displayText(text).split(/(\s+)/).forEach(token => {
+      if (/^\s+$/.test(token)) {
+        words.append(document.createTextNode(token));
+        return;
+      }
+      const word = document.createElement('span');
+      word.className = 'word';
+      word.dataset.word = words.querySelectorAll('.word').length;
+      word.textContent = token;
+      const highlight = highlights.find(item => item.verse === number && Number(word.dataset.word) >= item.start && Number(word.dataset.word) <= item.end);
+      if (highlight) word.classList.add(`highlight-${highlight.color}`);
+      words.append(word);
+    });
 
     row.append(button, words);
     passage.append(row);
@@ -187,6 +216,38 @@ async function playVerse(button) {
 passage.addEventListener('click', event => {
   const button = event.target.closest('.verse-number');
   if (button) playVerse(button);
+});
+
+passage.addEventListener('mouseup', () => {
+  if (scriptMode) return;
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+
+  const range = selection.getRangeAt(0);
+  const selectedWords = [...passage.querySelectorAll('.verse-line .word')].filter(word => {
+    try {
+      return range.intersectsNode(word);
+    } catch (error) {
+      return false;
+    }
+  });
+  if (!selectedWords.length) return;
+
+  const line = selectedWords[0].closest('.verse-line');
+  if (!selectedWords.every(word => word.closest('.verse-line') === line)) {
+    selection.removeAllRanges();
+    status.textContent = 'Highlight one verse at a time.';
+    return;
+  }
+
+  const verse = Number(line.dataset.verse);
+  const indices = selectedWords.map(word => Number(word.dataset.word));
+  const nextColor = (highlights.length % 2) + 1;
+  highlights.push({ verse, start: Math.min(...indices), end: Math.max(...indices), color: nextColor });
+  saveHighlights();
+  selection.removeAllRanges();
+  updateDisplay();
+  status.textContent = `Highlighted a word group in verse ${verse}.`;
 });
 
 tropeToggle.addEventListener('click', () => {
