@@ -41,6 +41,8 @@ let highlightsReady = false;
 const recordings = new Map();
 let activeRecorder = null;
 let playbackAudioContext = null;
+let hoveredGroupAudio = null;
+let hoveredGroupId = null;
 const ALIYAH_HEADINGS = new Map([
   [15, 'Aliya 1'],
   [19, 'Aliyah 2'],
@@ -286,6 +288,45 @@ function playGroupRecording(button) {
   status.textContent = `Playing recording for group ${groupId}.`;
 }
 
+function stopHoveredGroup() {
+  if (hoveredGroupAudio) {
+    hoveredGroupAudio.pause();
+    hoveredGroupAudio.src = '';
+  }
+  hoveredGroupAudio = null;
+  hoveredGroupId = null;
+  if (!activePlaylist) setPlayingGroup(null);
+}
+
+function playHoveredGroup(groupId) {
+  if (hoveredGroupId === groupId) return;
+  stopRecordedVerse();
+  stopHoveredGroup();
+  const recording = recordings.get(groupId);
+  if (!recording) return;
+
+  const audio = new Audio(recordingUrl(recording.object_path));
+  hoveredGroupId = groupId;
+  hoveredGroupAudio = audio;
+  setPlayingGroup(groupId);
+  status.textContent = `Playing highlighted group ${groupId}.`;
+  audio.onended = () => {
+    if (hoveredGroupAudio !== audio) return;
+    hoveredGroupAudio = null;
+    hoveredGroupId = null;
+    setPlayingGroup(null);
+  };
+  audio.onerror = () => {
+    if (hoveredGroupAudio !== audio) return;
+    stopHoveredGroup();
+    status.textContent = 'The saved group recording could not be played.';
+  };
+  audio.play().catch(() => {
+    if (hoveredGroupAudio !== audio) return;
+    stopHoveredGroup();
+  });
+}
+
 function displayText(text) {
   if (scriptMode) return text.normalize('NFD').replace(/[\u0591-\u05BD\u05BF-\u05C7]/g, '');
   if (!showTrope) return text.replace(/[\u0591-\u05AF]/g, '');
@@ -471,6 +512,7 @@ async function playRecordedVerse(button) {
   }
 
   stopRecordedVerse();
+  stopHoveredGroup();
   resetActiveVerse();
   const groups = highlights
     .filter(group => group.verse === number && recordings.has(group.id))
@@ -593,6 +635,20 @@ passage.addEventListener('click', event => {
   }
   const button = event.target.closest('.verse-number');
   if (button) playRecordedVerse(button);
+});
+
+passage.addEventListener('mouseover', event => {
+  const target = event.target.closest('[data-group-id]');
+  if (!target || !passage.contains(target)) return;
+  playHoveredGroup(Number(target.dataset.groupId));
+});
+
+passage.addEventListener('mouseout', event => {
+  const target = event.target.closest('[data-group-id]');
+  if (!target || Number(target.dataset.groupId) !== hoveredGroupId) return;
+  const nextTarget = event.relatedTarget?.closest?.('[data-group-id]');
+  if (nextTarget && Number(nextTarget.dataset.groupId) === hoveredGroupId) return;
+  stopHoveredGroup();
 });
 
 passage.addEventListener('mouseup', async () => {

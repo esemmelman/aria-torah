@@ -168,6 +168,7 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .word.highlight-2 { color: #244b3a; background: #bcdac8; }
 .word-space.highlight-1 { background: #f3d88e; }
 .word-space.highlight-2 { background: #bcdac8; }
+.word[data-group-id], .word-space[data-group-id] { cursor: pointer; }
 .word.audio-active {
   color: #17251d;
   font-weight: 700;
