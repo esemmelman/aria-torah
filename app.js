@@ -1,5 +1,7 @@
 const passage = document.querySelector('#passage');
 const status = document.querySelector('#status');
+const tropeToggle = document.querySelector('#trope-toggle');
+const scriptToggle = document.querySelector('#script-toggle');
 
 const FALLBACK_VERSES = [
   'ויאמר יהוה אל משה מה תצעק אלי דבר אל בני ישראל ויסעו׃',
@@ -22,6 +24,9 @@ const FALLBACK_VERSES = [
 
 const audioByVerse = new Map();
 let activeVerse = null;
+let sourceVerses = FALLBACK_VERSES;
+let showTrope = false;
+let scriptMode = false;
 const ALIYAH_HEADINGS = new Map([
   [15, 'Aliya 1'],
   [19, 'Aliyah 2'],
@@ -60,6 +65,21 @@ function stripHtml(value) {
   return template.content.textContent.trim();
 }
 
+function displayText(text) {
+  if (scriptMode) return text.normalize('NFD').replace(/[\u0591-\u05BD\u05BF-\u05C7]/g, '');
+  if (!showTrope) return text.replace(/[\u0591-\u05AF]/g, '');
+  return text;
+}
+
+function updateDisplay() {
+  document.body.classList.toggle('script-mode', scriptMode);
+  tropeToggle.classList.toggle('active', showTrope);
+  tropeToggle.setAttribute('aria-pressed', String(showTrope));
+  scriptToggle.classList.toggle('active', scriptMode);
+  scriptToggle.setAttribute('aria-pressed', String(scriptMode));
+  renderVerses(sourceVerses);
+}
+
 function renderVerses(texts) {
   passage.replaceChildren();
   texts.forEach((text, index) => {
@@ -84,7 +104,7 @@ function renderVerses(texts) {
     const words = document.createElement('span');
     words.className = 'verse-line';
     words.lang = 'he';
-    words.textContent = text;
+    words.textContent = displayText(text);
 
     row.append(button, words);
     passage.append(row);
@@ -97,7 +117,8 @@ async function loadPointedText() {
     if (!response.ok) throw new Error('Text request failed');
     const data = await response.json();
     if (!Array.isArray(data.he) || data.he.length !== 16) throw new Error('Unexpected passage');
-    renderVerses(data.he.map(stripHtml));
+    sourceVerses = data.he.map(stripHtml);
+    updateDisplay();
   } catch (error) {
     // The unpointed passage is already visible when the text API is unavailable.
   }
@@ -168,5 +189,15 @@ passage.addEventListener('click', event => {
   if (button) playVerse(button);
 });
 
-renderVerses(FALLBACK_VERSES);
+tropeToggle.addEventListener('click', () => {
+  showTrope = !showTrope;
+  updateDisplay();
+});
+
+scriptToggle.addEventListener('click', () => {
+  scriptMode = !scriptMode;
+  updateDisplay();
+});
+
+updateDisplay();
 loadPointedText();

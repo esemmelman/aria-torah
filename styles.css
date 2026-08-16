@@ -53,7 +53,33 @@ body::before {
   letter-spacing: .22em;
 }
 
-h1 { margin: 0 0 34px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
+h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
+
+.display-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.display-toggle {
+  min-width: 84px;
+  border: 1px solid #cab98f;
+  border-radius: 999px;
+  padding: 9px 16px;
+  color: var(--ink);
+  background: #fffaf0;
+  cursor: pointer;
+  font: 600 .8rem/1 Arial, sans-serif;
+}
+
+.display-toggle:hover, .display-toggle.active {
+  border-color: var(--green);
+  color: white;
+  background: var(--green);
+}
+
+.display-toggle:focus-visible { outline: 3px solid rgba(54,90,71,.4); outline-offset: 3px; }
 
 .passage-card {
   position: relative;
@@ -114,6 +140,13 @@ h1 { margin: 0 0 34px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .verse-number:disabled { opacity: .55; cursor: wait; }
 .verse-line { unicode-bidi: isolate; }
 
+.script-mode .verse-row {
+  font-family: "Taamey Frank CLM", "Frank Ruhl Libre", "Times New Roman", serif;
+  line-height: 1.65;
+}
+
+.script-mode .verse-number, .script-mode .aliyah-heading { display: none; }
+
 .corner { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: var(--gold); font-family: "FrankRuehl", "Frank Ruhl Libre", serif; }
 
 .verse-text {
@@ -144,6 +177,7 @@ h1 { margin: 0 0 34px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .controls label { color: var(--muted); font: .78rem Arial, sans-serif; }
 select { margin-left: 6px; padding: 8px 12px; }
 .status { min-height: 1.3em; color: var(--muted); font-style: italic; }
+.version { margin: 18px 0 0; color: var(--muted); font: .7rem/1 Arial, sans-serif; letter-spacing: .08em; }
 
 .translation { max-width: 650px; margin: 38px auto 0; padding-top: 25px; border-top: 1px solid rgba(82,70,45,.2); }
 .translation h2 { margin: 0 0 8px; color: var(--gold); font: 700 .72rem Arial, sans-serif; letter-spacing: .18em; text-transform: uppercase; }
