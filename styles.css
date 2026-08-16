@@ -8,6 +8,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Stam Ashkenaz CLM";
+  src: url("fonts/StamAshkenazCLM.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --ink: #263026;
@@ -141,7 +149,7 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .verse-line { unicode-bidi: isolate; }
 
 .script-mode .verse-row {
-  font-family: "Taamey Frank CLM", "Frank Ruhl Libre", "Times New Roman", serif;
+  font-family: "Stam Ashkenaz CLM", "Taamey Frank CLM", "Frank Ruhl Libre", serif;
   line-height: 1.65;
 }
 
