@@ -40,6 +40,7 @@ let highlights = loadHighlights();
 let highlightsReady = false;
 const recordings = new Map();
 let activeRecorder = null;
+let playbackAudioContext = null;
 const ALIYAH_HEADINGS = new Map([
   [15, 'Aliya 1'],
   [19, 'Aliyah 2'],
@@ -334,7 +335,10 @@ function renderVerses(texts) {
       word.dataset.word = wordIndex;
       word.textContent = token;
       const highlight = highlightForWord(number, wordIndex);
-      if (highlight) word.classList.add(`highlight-${highlight.color}`);
+      if (highlight) {
+        word.classList.add(`highlight-${highlight.color}`);
+        word.dataset.groupId = highlight.id;
+      }
       words.append(word);
 
       if (wordIndex < tokens.length - 1) {
@@ -342,7 +346,10 @@ function renderVerses(texts) {
         space.className = 'word-space';
         space.textContent = ' ';
         const nextHighlight = highlightForWord(number, wordIndex + 1);
-        if (highlight && nextHighlight === highlight) space.classList.add(`highlight-${highlight.color}`);
+        if (highlight && nextHighlight === highlight) {
+          space.classList.add(`highlight-${highlight.color}`);
+          space.dataset.groupId = highlight.id;
+        }
         words.append(space);
       }
 
@@ -402,12 +409,58 @@ function resetActiveVerse() {
 
 function stopRecordedVerse(message = '') {
   if (!activePlaylist) return;
-  activePlaylist.audio?.pause();
+  activePlaylist.sources?.forEach(source => {
+    try { source.stop(); } catch (error) { /* The source may already have ended. */ }
+  });
+  activePlaylist.timers?.forEach(clearTimeout);
   activePlaylist.finishCurrent?.();
   activePlaylist.button.classList.remove('playing');
   activePlaylist.button.textContent = activePlaylist.number;
+  setPlayingGroup(null);
   activePlaylist = null;
   if (message) status.textContent = message;
+}
+
+function setPlayingGroup(groupId) {
+  passage.querySelectorAll('.word.audio-active, .word-space.audio-active').forEach(element => element.classList.remove('audio-active'));
+  if (!groupId) return;
+  passage.querySelectorAll(`[data-group-id="${groupId}"]`).forEach(element => element.classList.add('audio-active'));
+}
+
+function speechBounds(buffer) {
+  const windowSize = Math.max(1, Math.floor(buffer.sampleRate * .01));
+  const totalWindows = Math.ceil(buffer.length / windowSize);
+  const levels = [];
+  for (let windowIndex = 0; windowIndex < totalWindows; windowIndex += 1) {
+    const start = windowIndex * windowSize;
+    const end = Math.min(start + windowSize, buffer.length);
+    let sumSquares = 0;
+    let sampleCount = 0;
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const samples = buffer.getChannelData(channel);
+      for (let index = start; index < end; index += 1) {
+        sumSquares += samples[index] * samples[index];
+        sampleCount += 1;
+      }
+    }
+    levels.push(Math.sqrt(sumSquares / sampleCount));
+  }
+
+  const threshold = Math.max(.003, Math.max(...levels) * .035);
+  const firstWindow = levels.findIndex(level => level >= threshold);
+  if (firstWindow < 0) return { start: 0, duration: buffer.duration };
+  const lastWindow = levels.findLastIndex(level => level >= threshold);
+  const start = Math.max(0, (firstWindow * windowSize / buffer.sampleRate) - .06);
+  const end = Math.min(buffer.duration, ((lastWindow + 1) * windowSize / buffer.sampleRate) + .06);
+  return { start, duration: Math.max(.1, end - start) };
+}
+
+async function prepareGroupAudio(group, audioContext) {
+  const recording = recordings.get(group.id);
+  const response = await fetch(recordingUrl(recording.object_path));
+  if (!response.ok) throw new Error('Recording download failed');
+  const buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
+  return { group, buffer, ...speechBounds(buffer) };
 }
 
 async function playRecordedVerse(button) {
@@ -429,24 +482,42 @@ async function playRecordedVerse(button) {
   }
 
   const token = Symbol('verse-playlist');
-  activePlaylist = { number, button, token, audio: null, finishCurrent: null };
+  activePlaylist = { number, button, token, sources: [], timers: [], finishCurrent: null };
   button.classList.add('playing');
   button.textContent = '■';
 
   try {
-    for (let index = 0; index < groups.length; index += 1) {
-      if (activePlaylist?.token !== token) return;
-      const recording = recordings.get(groups[index].id);
-      const audio = new Audio(recordingUrl(recording.object_path));
-      activePlaylist.audio = audio;
-      status.textContent = `Playing verse ${number}: group ${index + 1} of ${groups.length}.`;
-      await new Promise((resolve, reject) => {
-        activePlaylist.finishCurrent = resolve;
-        audio.onended = resolve;
-        audio.onerror = reject;
-        audio.play().catch(reject);
-      });
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!playbackAudioContext) {
+      try {
+        playbackAudioContext = new AudioContextClass({ sampleRate: 48000 });
+      } catch (error) {
+        playbackAudioContext = new AudioContextClass();
+      }
     }
+    await playbackAudioContext.resume();
+    status.textContent = `Preparing verse ${number}…`;
+    const prepared = await Promise.all(groups.map(group => prepareGroupAudio(group, playbackAudioContext)));
+    if (activePlaylist?.token !== token) return;
+
+    let startAt = playbackAudioContext.currentTime + .08;
+    const finished = new Promise(resolve => { activePlaylist.finishCurrent = resolve; });
+    prepared.forEach((clip, index) => {
+      const source = playbackAudioContext.createBufferSource();
+      source.buffer = clip.buffer;
+      source.connect(playbackAudioContext.destination);
+      source.start(startAt, clip.start, clip.duration);
+      activePlaylist.sources.push(source);
+      const delay = Math.max(0, (startAt - playbackAudioContext.currentTime) * 1000);
+      activePlaylist.timers.push(setTimeout(() => {
+        if (activePlaylist?.token !== token) return;
+        setPlayingGroup(clip.group.id);
+        status.textContent = `Playing verse ${number}: group ${index + 1} of ${groups.length}.`;
+      }, delay));
+      if (index === prepared.length - 1) source.onended = activePlaylist.finishCurrent;
+      startAt += clip.duration;
+    });
+    await finished;
 
     if (activePlaylist?.token === token) {
       stopRecordedVerse(`Verse ${number} complete.`);
