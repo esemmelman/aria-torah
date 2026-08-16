@@ -147,7 +147,11 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .verse-number:focus-visible { outline: 3px solid rgba(54,90,71,.4); outline-offset: 3px; }
 .verse-number:disabled { opacity: .55; cursor: wait; }
 .verse-line { unicode-bidi: isolate; }
-.word { border-radius: .12em; }
+.word {
+  border-radius: .12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
 .word.highlight-1 { color: #76500f; background: #f3d88e; }
 .word.highlight-2 { color: #244b3a; background: #bcdac8; }
 

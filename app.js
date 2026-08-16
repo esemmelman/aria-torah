@@ -121,14 +121,12 @@ function renderVerses(texts) {
     words.lang = 'he';
     words.dataset.verse = number;
 
-    displayText(text).split(/(\s+)/).forEach(token => {
-      if (/^\s+$/.test(token)) {
-        words.append(document.createTextNode(token));
-        return;
-      }
+    const displayedText = displayText(text);
+    const tokens = displayedText.match(/\S+\s*/g) || [];
+    tokens.forEach(token => {
       const word = document.createElement('span');
       word.className = 'word';
-      word.dataset.word = words.querySelectorAll('.word').length;
+      word.dataset.word = words.childElementCount;
       word.textContent = token;
       const highlight = highlights.find(item => item.verse === number && Number(word.dataset.word) >= item.start && Number(word.dataset.word) <= item.end);
       if (highlight) word.classList.add(`highlight-${highlight.color}`);
@@ -242,8 +240,21 @@ passage.addEventListener('mouseup', () => {
 
   const verse = Number(line.dataset.verse);
   const indices = selectedWords.map(word => Number(word.dataset.word));
-  const nextColor = (highlights.length % 2) + 1;
-  highlights.push({ verse, start: Math.min(...indices), end: Math.max(...indices), color: nextColor });
+  const start = Math.min(...indices);
+  const end = Math.max(...indices);
+  const overlapping = highlights.filter(item => item.verse === verse && item.start <= end && item.end >= start);
+
+  if (overlapping.length) {
+    highlights = highlights.filter(item => !overlapping.includes(item));
+    saveHighlights();
+    selection.removeAllRanges();
+    updateDisplay();
+    status.textContent = `Cleared highlighting in verse ${verse}.`;
+    return;
+  }
+
+  const nextColor = highlights.length ? (highlights.at(-1).color % 2) + 1 : 1;
+  highlights.push({ verse, start, end, color: nextColor });
   saveHighlights();
   selection.removeAllRanges();
   updateDisplay();
