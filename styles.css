@@ -169,18 +169,13 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 .word-space.highlight-1 { background: #f3d88e; }
 .word-space.highlight-2 { background: #bcdac8; }
 .word.audio-active {
-  position: relative;
-  z-index: 1;
   color: #17251d;
   font-weight: 700;
-  outline: 3px solid var(--green);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 5px rgba(255,253,247,.88);
 }
-.word-space.audio-active { font-weight: 700; outline: 3px solid var(--green); }
+.word-space.audio-active { font-weight: 700; }
 
 .group-audio-controls {
-  display: inline-flex;
+  display: none;
   direction: ltr;
   gap: 3px;
   margin: 0 .2em;
@@ -214,7 +209,7 @@ h1 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 400; }
 }
 
 .script-mode .word[class*="highlight-"], .script-mode .word-space[class*="highlight-"] { color: inherit; background: transparent; }
-.script-mode .audio-active { outline: 0; box-shadow: none; font-weight: inherit; }
+.script-mode .audio-active { font-weight: inherit; }
 
 .corner { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: var(--gold); font-family: "FrankRuehl", "Frank Ruhl Libre", serif; }
 
