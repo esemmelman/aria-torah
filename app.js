@@ -2,6 +2,7 @@ const passage = document.querySelector('#passage');
 const status = document.querySelector('#status');
 const tropeToggle = document.querySelector('#trope-toggle');
 const scriptToggle = document.querySelector('#script-toggle');
+const audioToggle = document.querySelector('#audio-toggle');
 const SUPABASE_URL = 'https://fgomaujsdblpzxhnnqrg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_JOUqLZDnfGu_yCa6k6FVDQ_AYwpr72i';
 const SUPABASE_STORAGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnb21hdWpzZGJscHp4aG5ucXJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNjM3MjYsImV4cCI6MjA5OTgzOTcyNn0.1iMPI_7F_8ioNVnuThxqAKfMfD7G4NbyXilXZEERScw';
@@ -35,6 +36,7 @@ let activePlaylist = null;
 let sourceVerses = FALLBACK_VERSES;
 let showTrope = true;
 let scriptMode = false;
+let audioEnabled = true;
 const HIGHLIGHT_STORAGE_KEY = 'aria-torah-highlights-v1';
 let highlights = loadHighlights();
 let highlightsReady = false;
@@ -201,6 +203,10 @@ async function uploadRecording(groupId, blob) {
 }
 
 async function toggleGroupRecording(button) {
+  if (window.passageRecordingBusy) {
+    status.textContent = 'Stop the passage recording before recording a group.';
+    return;
+  }
   if (!highlightsReady) {
     status.textContent = 'Please wait for saved groups to finish loading.';
     return;
@@ -277,6 +283,7 @@ async function toggleGroupRecording(button) {
 }
 
 function playGroupRecording(button) {
+  if (window.passageRecordingBusy || !audioEnabled) return;
   stopRecordedVerse();
   const groupId = Number(button.dataset.groupId);
   const recording = recordings.get(groupId);
@@ -303,6 +310,7 @@ function stopHoveredGroup() {
 }
 
 function playHoveredGroup(groupId) {
+  if (window.passageRecordingBusy || !audioEnabled) return;
   if (hoveredGroupId === groupId) return;
   stopRecordedVerse();
   stopHoveredGroup();
@@ -338,11 +346,13 @@ function displayText(text) {
 }
 
 function updateDisplay() {
+  if (scriptMode && audioEnabled) setAudioEnabled(false);
   document.body.classList.toggle('script-mode', scriptMode);
   tropeToggle.classList.toggle('active', showTrope);
   tropeToggle.setAttribute('aria-pressed', String(showTrope));
   scriptToggle.classList.toggle('active', scriptMode);
   scriptToggle.setAttribute('aria-pressed', String(scriptMode));
+  audioToggle.disabled = scriptMode;
   renderVerses(sourceVerses);
 }
 
@@ -509,6 +519,7 @@ async function prepareGroupAudio(group, audioContext) {
 }
 
 async function playRecordedVerse(button) {
+  if (window.passageRecordingBusy || !audioEnabled) return;
   const number = Number(button.dataset.verse);
   if (activePlaylist?.number === number) {
     stopRecordedVerse(`Verse ${number} playback stopped.`);
@@ -638,7 +649,7 @@ passage.addEventListener('click', event => {
     return;
   }
   const button = event.target.closest('.verse-number');
-  if (button) playRecordedVerse(button);
+  if (button && audioEnabled) playRecordedVerse(button);
 });
 
 passage.addEventListener('mouseover', event => {
@@ -730,7 +741,22 @@ tropeToggle.addEventListener('click', () => {
 
 scriptToggle.addEventListener('click', () => {
   scriptMode = !scriptMode;
+  if (scriptMode) setAudioEnabled(false);
   updateDisplay();
+});
+
+function setAudioEnabled(enabled) {
+  audioEnabled = enabled;
+  audioToggle.checked = enabled;
+  if (!enabled) {
+    stopHoveredGroup();
+    stopRecordedVerse();
+    resetActiveVerse();
+  }
+}
+
+audioToggle.addEventListener('change', () => {
+  setAudioEnabled(scriptMode ? false : audioToggle.checked);
 });
 
 updateDisplay();

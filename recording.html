@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Aria · Saved recording</title>
+  <link rel="stylesheet" href="styles.css?v=1.5.8">
+</head>
+<body>
+  <main class="page">
+    <h1>Aria’s recording</h1>
+    <p id="playback-status" role="status">Loading recording…</p>
+    <section class="recordings-card" id="saved-recording" hidden>
+      <p><strong>Name:</strong> Aria</p>
+      <p><strong>Start Time:</strong> <span id="saved-start-time"></span></p>
+      <audio id="saved-audio" controls preload="metadata" aria-label="Play Aria’s saved recording"></audio>
+    </section>
+  </main>
+  <script src="recording-player.js?v=1.5.8"></script>
+</body>
+</html>

@@ -15,8 +15,18 @@
     <header class="page-header">
       <p class="eyebrow">שְׁמוֹת · EXODUS</p>
       <h1>Chapter 14, verses 15–30</h1>
+      <div class="record-controls">
+        <button id="record-button" type="button" aria-pressed="false" disabled>Record</button>
+        <p id="record-status" role="status"></p>
+      </div>
 
-      <div class="display-controls" aria-label="Text display options">
+      <div class="display-controls" aria-label="Display and audio options">
+        <label class="audio-toggle" for="audio-toggle">
+          <span>Audio</span>
+          <input id="audio-toggle" type="checkbox" checked>
+          <span class="audio-toggle-track" aria-hidden="true"></span>
+        </label>
+        <span class="display-controls-spacer" aria-hidden="true"></span>
         <button class="display-toggle active" id="trope-toggle" type="button" aria-pressed="true">Trope</button>
         <button class="display-toggle" id="script-toggle" type="button" aria-pressed="false">Script</button>
       </div>
@@ -25,9 +35,20 @@
     <section class="passage-card" id="passage" aria-label="Exodus chapter 14, verses 15 through 30"></section>
 
     <p class="status" id="status" aria-live="polite">Hover over a highlighted group to hear it, or select a verse number to play the whole verse.</p>
+    <section class="recordings-card" id="current-recording" aria-labelledby="recordings-heading" hidden>
+      <h2 id="recordings-heading">Current recording</h2>
+      <p>Only your current recording is available here. Times are shown in Pacific time.</p>
+      <div class="recordings-scroll">
+        <table class="recordings-table">
+          <thead><tr><th scope="col">Name</th><th scope="col">Start Time</th><th scope="col">Playback</th><th scope="col">Delete</th></tr></thead>
+          <tbody id="recordings-list"></tbody>
+        </table>
+      </div>
+    </section>
     <p class="audio-credit">Group recordings saved with Supabase</p>
-    <p class="version">Version 1.5.7</p>
+    <p class="version">Version 1.5.8</p>
   </main>
   <script src="app.js"></script>
+  <script src="recordings.js"></script>
 </body>
 </html>
