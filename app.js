@@ -9,6 +9,7 @@ const SUPABASE_STORAGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 const HIGHLIGHT_TABLE = 'aria_torah_highlight_groups_v1';
 const RECORDING_TABLE = 'aria_torah_group_recordings_v1';
 const RECORDING_BUCKET = 'aria-torah-group-recordings-v1';
+// Keep the existing storage key so expanding the passage preserves saved groups.
 const PASSAGE_KEY = 'exodus-14-15-30';
 
 const FALLBACK_VERSES = [
@@ -27,7 +28,8 @@ const FALLBACK_VERSES = [
   'ויט משה את ידו על הים וישב הים לפנות בקר לאיתנו ומצרים נסים לקראתו וינער יהוה את מצרים בתוך הים׃',
   'וישבו המים ויכסו את הרכב ואת הפרשים לכל חיל פרעה הבאים אחריהם בים לא נשאר בהם עד אחד׃',
   'ובני ישראל הלכו ביבשה בתוך הים והמים להם חמה מימינם ומשמאלם׃',
-  'ויושע יהוה ביום ההוא את ישראל מיד מצרים וירא ישראל את מצרים מת על שפת הים׃'
+  'ויושע יהוה ביום ההוא את ישראל מיד מצרים וירא ישראל את מצרים מת על שפת הים׃',
+  'וירא ישראל את היד הגדלה אשר עשה יהוה במצרים וייראו העם את יהוה ויאמינו ביהוה ובמשה עבדו׃'
 ];
 
 const audioByVerse = new Map();
@@ -442,10 +444,10 @@ function renderVerses(texts) {
 
 async function loadPointedText() {
   try {
-    const response = await fetch('https://www.sefaria.org/api/texts/Exodus.14.15-30?context=0');
+    const response = await fetch('https://www.sefaria.org/api/texts/Exodus.14.15-31?context=0');
     if (!response.ok) throw new Error('Text request failed');
     const data = await response.json();
-    if (!Array.isArray(data.he) || data.he.length !== 16) throw new Error('Unexpected passage');
+    if (!Array.isArray(data.he) || data.he.length !== FALLBACK_VERSES.length) throw new Error('Unexpected passage');
     sourceVerses = data.he.map(stripHtml);
     updateDisplay();
   } catch (error) {
