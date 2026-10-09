@@ -11,6 +11,7 @@ const RECORDING_TABLE = 'aria_torah_group_recordings_v1';
 const RECORDING_BUCKET = 'aria-torah-group-recordings-v1';
 // Keep the existing storage key so expanding the passage preserves saved groups.
 const PASSAGE_KEY = 'exodus-14-15-30';
+const GROUP_EDITING_ENABLED = false;
 
 const FALLBACK_VERSES = [
   'ויאמר יהוה אל משה מה תצעק אלי דבר אל בני ישראל ויסעו׃',
@@ -410,7 +411,7 @@ function renderVerses(texts) {
         words.append(space);
       }
 
-      if (!scriptMode && highlight && wordIndex === highlight.end) {
+      if (GROUP_EDITING_ENABLED && !scriptMode && highlight && wordIndex === highlight.end) {
         const controls = document.createElement('span');
         controls.className = 'group-audio-controls';
 
@@ -669,6 +670,7 @@ passage.addEventListener('mouseout', event => {
 });
 
 passage.addEventListener('mouseup', async () => {
+  if (!GROUP_EDITING_ENABLED) return;
   if (scriptMode) return;
   if (!highlightsReady) {
     status.textContent = 'Please wait for saved highlights to finish loading.';
